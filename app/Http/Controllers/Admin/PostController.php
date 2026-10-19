@@ -1,0 +1,12 @@
+<?php
+namespace App\Http\Controllers\Admin;
+use App\Http\Controllers\Controller; use App\Models\Post; use App\Models\Unit; use Illuminate\Http\Request; use Illuminate\Support\Str; use Illuminate\Support\Facades\Storage;
+class PostController extends Controller {
+ public function index(){ $posts=Post::with('unit')->latest()->paginate(12); return view('admin.posts.index',compact('posts')); }
+ public function create(){ $post=new Post; $units=Unit::all(); return view('admin.posts.form',compact('post','units')); }
+ public function store(Request $r){ $data=$this->validated($r); if($r->hasFile('cover_image')) $data['cover_image']=$r->file('cover_image')->store('posts','public'); if($r->hasFile('document')) $data['document_path']=$r->file('document')->store('documents','public'); $data['slug']=Str::slug($data['title']).'-'.Str::lower(Str::random(5)); $data['published_at']=($data['status']==='published')?($data['published_at']??now()):null; Post::create($data); return redirect()->route('admin.publikasi.index')->with('success','Publikasi berhasil dibuat.'); }
+ public function edit(Post $post){$units=Unit::all(); return view('admin.posts.form',compact('post','units'));}
+ public function update(Request $r, Post $post){$data=$this->validated($r); if($r->hasFile('cover_image')){if($post->cover_image) Storage::disk('public')->delete($post->cover_image); $data['cover_image']=$r->file('cover_image')->store('posts','public');} if($r->hasFile('document')){$data['document_path']=$r->file('document')->store('documents','public');} $data['published_at']=($data['status']==='published')?($data['published_at']??$post->published_at??now()):null; $post->update($data); return redirect()->route('admin.publikasi.index')->with('success','Publikasi diperbarui.'); }
+ public function destroy(Post $post){if($post->cover_image) Storage::disk('public')->delete($post->cover_image); $post->delete(); return back()->with('success','Publikasi dihapus.');}
+ private function validated(Request $r): array {$data=$r->validate(['unit_id'=>'nullable|exists:units,id','title'=>'required|string|max:200','type'=>'required|in:berita,jurnal,pengumuman','excerpt'=>'nullable|string|max:500','body'=>'required|string','status'=>'required|in:draft,published','published_at'=>'nullable|date','cover_image'=>'nullable|image|max:4096','document'=>'nullable|file|mimes:pdf,doc,docx|max:10240']); unset($data['cover_image'],$data['document']); return $data;}
+}
